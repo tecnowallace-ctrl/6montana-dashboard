@@ -1,5 +1,9 @@
 node_modules/
-.DS_Store
-Thumbs.db
 .env
+.DS_Store
 .vscode/
+dist/
+build/
+*.log
+__pycache__/
+*.pyc
