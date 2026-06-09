@@ -2,8 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Montana - Dashboard Operativo</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12151d">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Montana">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -308,6 +316,17 @@ tbody tr:hover td{background:var(--card2)}
 .sem4-estado{font-size:10px;font-weight:700;margin-top:7px;display:flex;align-items:center;gap:5px}
 @media(max-width:680px){.sem4-grid{grid-template-columns:repeat(2,1fr)}}
 
+
+.kpi-filtros{background:var(--card);border:1px solid var(--border-soft);border-radius:14px;padding:14px 18px;box-shadow:var(--shadow);margin-bottom:16px;display:flex;flex-direction:column;gap:12px}
+.kpi-filtro-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kpi-mes-pills,.kpi-per-btns{display:flex;gap:7px;flex-wrap:wrap}
+.kpi-mpill{padding:6px 14px;border-radius:18px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;transition:all .2s}
+.kpi-mpill:hover{border-color:var(--gold);color:var(--gold)}
+.kpi-mpill.active{background:linear-gradient(135deg,var(--gold),var(--ember));border-color:transparent;color:#fff}
+.kpi-pbtn{padding:8px 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;transition:all .2s}
+.kpi-pbtn:hover{border-color:var(--gold);color:var(--gold)}
+.kpi-pbtn.active{background:linear-gradient(135deg,var(--gold),var(--ember));border-color:transparent;color:#fff}
+
 </style>
 </head><body>
 <div id="loginScreen">
@@ -419,12 +438,21 @@ tbody tr:hover td{background:var(--card2)}
       <div class="kpi-control">
         <div>
           <div class="kpi-control-title">Tablero de control del administrador</div>
-          <div class="kpi-control-sub">Cada indicador muestra el avance del dia, la semana y el mes contra su meta. Rojo = no se cumple, requiere accion.</div>
+          <div class="kpi-control-sub">Elige el mes y el periodo (un dia o una semana). Cada indicador se compara contra su meta del periodo. Rojo = no se cumple.</div>
         </div>
         <div class="kpi-control-right">
-          <span class="field-label">Fecha de referencia</span>
-          <input type="date" class="input date" id="kpiFecha" onchange="renderKPIsAdmin()">
           <button class="btn btn-gold" onclick="descargarKPIsPDF()">Descargar informe PDF</button>
+        </div>
+      </div>
+      <div class="kpi-filtros">
+        <div class="kpi-filtro-row">
+          <span class="field-label">Mes</span>
+          <span class="kpi-mes-pills" id="kpiMesPills"></span>
+        </div>
+        <div class="kpi-filtro-row">
+          <span class="field-label">Periodo</span>
+          <span class="kpi-per-btns" id="kpiPerBtns"></span>
+          <input type="date" class="input date" id="kpiDiaSel" style="display:none;margin-left:6px" onchange="renderKPIsAdmin()">
         </div>
       </div>
       <div id="kpiSemaforoLeyenda" class="kpi-leyenda"></div>
@@ -504,6 +532,7 @@ var METAS = {
   pct_cocina:0.30, pct_nomina:0.30, pct_servicios:0.20
 };
 var CIERRES=[],GASTOS=[],selectedMes=5,activeWeekVentas=-1,activeWeekGastos=-1,chartInstances={},historialFiltrado=[],currentView='resumen';
+var kpiMes=null,kpiPeriodo='dia',kpiDia='';
 var NOMBRES_MES=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 var TIPO_SHORT={'1 Insumos para Cocina':'1 Cocina','2 Insumo Bar licores Otros':'2 Bar/Licores','3 Compras TQ':'3 TQ','4 Insumos Personal':'4 Personal','5 Nomina y Turnos':'5 Nomina','6 Servicios Publicos y Arriendo':'6 Servicios','7 Gasto no programado':'7 No Prog.','8 Otros Gastos (Publicidad, Arreglos locativos, Cortesias, Gastos Varios)':'8 Otros'};
 var TIPO_COLOR={'1 Insumos para Cocina':'#e8613c','2 Insumo Bar licores Otros':'#2f7de1','3 Compras TQ':'#1faf6b','4 Insumos Personal':'#e0ac3f','5 Nomina y Turnos':'#7c5fd6','6 Servicios Publicos y Arriendo':'#e8941a','7 Gasto no programado':'#e0495f','8 Otros Gastos (Publicidad, Arreglos locativos, Cortesias, Gastos Varios)':'#8a93a6'};
@@ -822,36 +851,96 @@ function colPeriodo(label,val,meta,fmtFn,inverso){
   h+='</div>';
   return h;
 }
-function tarjetaKPI(icon,titulo,desc,campo,metaKey,fmtFn,inverso,dDia,dSem,dMes){
-  var h='<div class="kpi-big"><div class="kpi-big-head"><div class="kpi-big-ic">'+icon+'</div><div><div class="kpi-big-titulo">'+titulo+'</div><div class="kpi-big-desc">'+desc+'</div></div></div><div class="kpi-periodos">';
-  h+=colPeriodo('Dia',dDia[campo],METAS[metaKey+'_diaria'],fmtFn,inverso);
-  h+=colPeriodo('Semana',dSem[campo],METAS[metaKey+'_semanal'],fmtFn,inverso);
-  h+=colPeriodo('Mes',dMes[campo],METAS[metaKey+'_mensual'],fmtFn,inverso);
+function metaKPI(metaKey,suf){ if(metaKey==='ticket') return METAS.ticket_promedio; return METAS[metaKey+'_'+suf]; }
+function tarjetaKPI(icon,titulo,desc,campo,metaKey,fmtFn,inverso,datos,sufMeta,etiquetaPer){
+  var meta=metaKPI(metaKey,sufMeta);
+  var h='<div class="kpi-big"><div class="kpi-big-head"><div class="kpi-big-ic">'+icon+'</div><div><div class="kpi-big-titulo">'+titulo+'</div><div class="kpi-big-desc">'+desc+'</div></div></div><div class="kpi-periodos" style="grid-template-columns:1fr">';
+  h+=colPeriodo(etiquetaPer,datos[campo],meta,fmtFn,inverso);
   h+='</div></div>';
   return h;
 }
+function datosPeriodoMW(mes, periodo, dia){
+  // periodo: 'dia' (usa 'dia' fecha) o 'sem1'..'sem4'
+  var cs,gs;
+  if(periodo==='dia'){
+    cs=CIERRES.filter(function(r){return r.fecha===dia;});
+    gs=GASTOS.filter(function(r){return r.fecha===dia;});
+  } else {
+    var sem=parseInt(periodo.replace('sem',''),10);
+    cs=CIERRES.filter(function(r){return r.mes===mes && semanaDelMes(r.fecha)===sem;});
+    gs=GASTOS.filter(function(r){return r.mes===mes && semanaDelMes(r.fecha)===sem;});
+  }
+  var gt={};gs.forEach(function(r){gt[r.tipo]=(gt[r.tipo]||0)+r.valor;});
+  var tkRows=cs.filter(function(r){return r.ticket_carta>0;});
+  return {
+    venta_bruta:sumBy(cs,'venta_bruta'),
+    clientes:sumBy(cs,'clientes'),
+    ticket: tkRows.length?sumBy(tkRows,'ticket_carta')/tkRows.length:0,
+    ejecutivos:sumBy(cs,'ejecutivos'),
+    gastos:sumBy(gs,'valor'),
+    turnos:gt['5 Nomina y Turnos']||0,
+    ndias:cs.length
+  };
+}
+function buildKpiFiltros(){
+  // meses disponibles
+  var ms=[];CIERRES.forEach(function(d){if(ms.indexOf(d.mes)<0)ms.push(d.mes);});ms.sort(function(a,b){return a-b;});
+  if(kpiMes===null){kpiMes=ms.length?ms[ms.length-1]:selectedMes;}
+  var mp=document.getElementById('kpiMesPills');
+  if(mp){mp.innerHTML=ms.map(function(m){return '<button class="kpi-mpill '+(m===kpiMes?'active':'')+'" onclick="setKpiMes('+m+')">'+NOMBRES_MES[m]+'</button>';}).join('')||'<span style="font-size:12px;color:var(--muted)">Sin datos</span>';}
+  var pb=document.getElementById('kpiPerBtns');
+  if(pb){
+    var per=[['dia','Dia'],['sem1','Sem 1'],['sem2','Sem 2'],['sem3','Sem 3'],['sem4','Sem 4']];
+    pb.innerHTML=per.map(function(p){return '<button class="kpi-pbtn '+(kpiPeriodo===p[0]?'active':'')+'" onclick="setKpiPeriodo(\''+p[0]+'\')">'+p[1]+'</button>';}).join('');
+  }
+  // selector de dia: visible solo en modo dia
+  var ds=document.getElementById('kpiDiaSel');
+  if(ds){
+    ds.style.display = (kpiPeriodo==='dia')?'inline-block':'none';
+    // set default day within selected month
+    var diasMes=CIERRES.filter(function(r){return r.mes===kpiMes;}).map(function(r){return r.fecha;}).sort();
+    if(kpiPeriodo==='dia'){
+      if(!kpiDia || kpiDia.slice(5,7)!=String(kpiMes).padStart(2,'0')){
+        kpiDia = diasMes.length?diasMes[diasMes.length-1]:'';
+      }
+      ds.value=kpiDia;
+    }
+  }
+}
+function setKpiMes(m){kpiMes=m;kpiDia='';buildKpiFiltros();renderKPIsAdmin();}
+function setKpiPeriodo(p){kpiPeriodo=p;buildKpiFiltros();renderKPIsAdmin();}
 function renderKPIsAdmin(){
-  var inp=document.getElementById('kpiFecha');
-  if(inp && !inp.value){var f=CIERRES.map(function(d){return d.fecha;}).sort();inp.value=f.length?f[f.length-1]:new Date().toISOString().slice(0,10);}
-  var fecha=inp?inp.value:'';
-  if(!fecha){document.getElementById('kpiAdminGrid').innerHTML='<div class="no-data-banner">Selecciona una fecha de referencia</div>';return;}
-  // leyenda
+  buildKpiFiltros();
   document.getElementById('kpiSemaforoLeyenda').innerHTML=
     '<span><span class="kpi-ldot" style="background:#1faf6b"></span>En meta (100%+)</span>'+
     '<span><span class="kpi-ldot" style="background:#e8941a"></span>Cerca (80-99%)</span>'+
     '<span><span class="kpi-ldot" style="background:#e0495f"></span>No cumple (menos de 80%) - requiere accion</span>';
-  var _mesKpi=parseInt(fecha.slice(5,7),10);
-  renderEquilibrio('eqKpis',_mesKpi);renderSemanas4('sem4Kpis',_mesKpi);
-  var dDia=datosPeriodo(fecha,'dia'),dSem=datosPeriodo(fecha,'semana'),dMes=datosPeriodo(fecha,'mes');
+  // barra equilibrio y semanas del mes elegido
+  renderEquilibrio('eqKpis',kpiMes);renderSemanas4('sem4Kpis',kpiMes);
+  // dia seleccionado
+  var ds=document.getElementById('kpiDiaSel');
+  kpiDia = ds?ds.value:kpiDia;
+  // sufijo de meta y etiqueta segun periodo
+  var sufMeta = (kpiPeriodo==='dia')?'diaria':'semanal';
+  var etiqueta;
+  if(kpiPeriodo==='dia'){ etiqueta = kpiDia?('Dia '+kpiDia):'Selecciona un dia'; }
+  else { etiqueta = 'Semana '+kpiPeriodo.replace('sem','')+' - '+NOMBRES_MES[kpiMes]; }
+  if(kpiPeriodo==='dia' && !kpiDia){
+    document.getElementById('kpiAdminGrid').innerHTML='<div class="no-data-banner">Selecciona un dia del mes</div>';
+    return;
+  }
+  var datos=datosPeriodoMW(kpiMes,kpiPeriodo,kpiDia);
   var html='<div class="kpi-admin-grid">';
-  html+=tarjetaKPI('&#128176;','Venta Bruta','Ventas totales segun POS','venta_bruta','venta_bruta',fmt,false,dDia,dSem,dMes);
-  html+=tarjetaKPI('&#128101;','Clientes Menu Salon','Comensales atendidos (PAX)','clientes','clientes',fmtNum,false,dDia,dSem,dMes);
-  html+=tarjetaKPI('&#127915;','Ticket Promedio','Valor promedio por comensal','ticket','ticket',fmt,false,dDia,dSem,dMes);
-  html+=tarjetaKPI('&#127857;','Ejecutivos','Almuerzos ejecutivos vendidos (Lun-Vie)','ejecutivos','ejecutivos',fmtNum,false,dDia,dSem,dMes);
-  html+=tarjetaKPI('&#129534;','Control de Gastos','Gastos del periodo (menos es mejor)','gastos','gastos',fmt,true,dDia,dSem,dMes);
+  html+=tarjetaKPI('&#128176;','Venta Bruta','Ventas totales segun POS','venta_bruta','venta_bruta',fmt,false,datos,sufMeta,etiqueta);
+  html+=tarjetaKPI('&#128101;','Clientes Menu Salon','Comensales atendidos (PAX)','clientes','clientes',fmtNum,false,datos,sufMeta,etiqueta);
+  html+=tarjetaKPI('&#127915;','Ticket Promedio','Valor promedio por comensal','ticket','ticket',fmt,false,datos,sufMeta,etiqueta);
+  html+=tarjetaKPI('&#127857;','Ejecutivos','Almuerzos ejecutivos vendidos (Lun-Vie)','ejecutivos','ejecutivos',fmtNum,false,datos,sufMeta,etiqueta);
+  html+=tarjetaKPI('&#129534;','Control de Gastos','Gastos del periodo (menos es mejor)','gastos','gastos',fmt,true,datos,sufMeta,etiqueta);
   html+='</div>';
+  if(datos.ndias===0){html+='<div class="no-data-banner" style="margin-top:14px">No hay registros en este periodo</div>';}
   document.getElementById('kpiAdminGrid').innerHTML=html;
 }
+
 function renderSemaforoCharts(){renderKPIsAdmin();}
 
 function renderAnioResumen(){
@@ -911,9 +1000,16 @@ function renderCierre(){var fecha=document.getElementById('cierreFecha').value;i
   cont.innerHTML=html;
 }
 function descargarKPIsPDF(){
-  var inp=document.getElementById('kpiFecha');
-  var fecha=inp?inp.value:'';
-  if(!fecha){toast('Selecciona una fecha de referencia','error');return;}
+  // derivar una fecha de referencia desde el estado de la vista (mes + periodo)
+  var fecha='';
+  if(kpiPeriodo==='dia'){ var dsx=document.getElementById('kpiDiaSel'); fecha=(dsx&&dsx.value)?dsx.value:kpiDia; }
+  else {
+    var semN=parseInt(kpiPeriodo.replace('sem',''),10);
+    var diasSem=CIERRES.filter(function(r){return r.mes===kpiMes && semanaDelMes(r.fecha)===semN;}).map(function(r){return r.fecha;}).sort();
+    fecha=diasSem.length?diasSem[diasSem.length-1]:'';
+    if(!fecha){ var diasMesX=CIERRES.filter(function(r){return r.mes===kpiMes;}).map(function(r){return r.fecha;}).sort(); fecha=diasMesX.length?diasMesX[diasMesX.length-1]:''; }
+  }
+  if(!fecha){toast('Selecciona un periodo con datos','error');return;}
   var jsPDFns=window.jspdf||window.jsPDF;var PDF=jsPDFns?jsPDFns.jsPDF||jsPDFns:null;
   if(!PDF){toast('No se pudo cargar el generador PDF','error');return;}
   var doc=new PDF({unit:'pt',format:'a4'});
@@ -1264,6 +1360,16 @@ document.addEventListener('DOMContentLoaded',function(){
   if(ok){ document.getElementById('loginScreen').classList.add('hidden'); iniciarDashboard(); }
   else { document.getElementById('loginUser').focus(); }
 });
+</script>
+<script>
+// Registro del Service Worker (PWA) - permite instalar la app y abrir offline
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('service-worker.js').catch(function (e) {
+      console.log('SW no registrado:', e);
+    });
+  });
+}
 </script>
 </body>
 </html>
