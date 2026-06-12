@@ -427,6 +427,10 @@ tbody tr:hover td{background:var(--card2)}
       <div class="metas-bar" id="metasGastos"></div>
       <div class="week-selector" id="weekBtnsGastos"><button class="week-btn active" onclick="setWeekFilter(-1,this,'gastos')">Mes</button></div>
       <div class="grid-4" id="gastosKpis"></div>
+      <div class="section-title">Gastos por metodo de pago</div>
+      <div class="canales-grid" id="gastosMetodoPago"></div>
+      <div class="section-title">Cortesias</div>
+      <div class="canales-grid" id="gastosCortesias"></div>
       <div class="grid-2-1">
         <div class="chart-card"><div class="chart-title">Gastos por categoria</div><div class="chart-sub">Distribucion del gasto</div><div class="chart-wrap" style="height:250px"><canvas id="chartGastosBar"></canvas></div></div>
         <div class="chart-card"><div class="chart-title">Proporcion (%)</div><div class="chart-sub">Del total de egresos</div><div class="chart-wrap" style="height:210px;max-width:210px;margin:0 auto"><canvas id="chartGastosPie"></canvas></div></div>
@@ -567,14 +571,20 @@ var DEMO_CIERRES=[
 {fecha:"2026-06-08",dia:"Lunes",encargado:"Ami",mes:6,venta_bruta:1450000,propinas:95000,ipoconsumo:108000,venta_neta:1247000,clientes:28,alm_local:20,alm_dom:3,ticket_carta:76300,ejecutivos:23,canal_bonos:0,canal_eventos:0,canal_decoracion:0,canal_tq:0,qr:250000,nequi:60000,datafono:680000,daviplata:0,efectivo:460000}
 ];
 var DEMO_GASTOS=[
-{fecha:"2026-05-02",mes:5,tipo:"1 Insumos para Cocina",proveedor:"Premiun",producto:"Carne",valor:3000000},
-{fecha:"2026-05-02",mes:5,tipo:"6 Servicios Publicos y Arriendo",proveedor:"Dueno bodega",producto:"Arriendo",valor:15000000},
+{fecha:"2026-06-02",mes:6,tipo:"8 Otros Gastos",proveedor:"Casa",producto:"Postre cumpleanos",valor:35000,metodo:"Caja Menor",cortesia_producto:"Postre cumpleanos",cortesia_costo:35000},
+{fecha:"2026-06-06",mes:6,tipo:"8 Otros Gastos",proveedor:"Casa",producto:"Copa de vino",valor:28000,metodo:"Caja Menor",cortesia_producto:"Copa de vino",cortesia_costo:28000},
+{fecha:"2026-06-07",mes:6,tipo:"1 Insumos para Cocina",proveedor:"ACM",producto:"Verduras",valor:280000,metodo:"Efectivo"},
+{fecha:"2026-06-07",mes:6,tipo:"5 Nomina y Turnos",proveedor:"salon",producto:"Turno",valor:80000,metodo:"Caja Menor"},
+{fecha:"2026-06-06",mes:6,tipo:"6 Servicios Publicos y Arriendo",proveedor:"Dueno bodega",producto:"Arriendo",valor:15000000,metodo:"Transferencia"},
+
+{fecha:"2026-05-02",mes:5,tipo:"1 Insumos para Cocina",proveedor:"Premiun",producto:"Carne",valor:3000000,metodo:"Transferencia"},
+{fecha:"2026-05-02",mes:5,tipo:"6 Servicios Publicos y Arriendo",proveedor:"Dueno bodega",producto:"Arriendo",valor:15000000,metodo:"Transferencia"},
 {fecha:"2026-05-09",mes:5,tipo:"1 Insumos para Cocina",proveedor:"Premium",producto:"Carne",valor:2745600},
 {fecha:"2026-05-14",mes:5,tipo:"6 Servicios Publicos y Arriendo",proveedor:"Enel",producto:"Luz",valor:3443250},
 {fecha:"2026-05-19",mes:5,tipo:"1 Insumos para Cocina",proveedor:"ACM",producto:"Varios",valor:2454600},
-{fecha:"2026-05-19",mes:5,tipo:"2 Insumo Bar licores Otros",proveedor:"GAMEZ",producto:"Licores",valor:162570},
+{fecha:"2026-05-19",mes:5,tipo:"2 Insumo Bar licores Otros",proveedor:"GAMEZ",producto:"Licores",valor:162570,metodo:"Efectivo"},
 {fecha:"2026-05-19",mes:5,tipo:"3 Compras TQ",proveedor:"OTRO",producto:"Desayunos TQ",valor:214200},
-{fecha:"2026-05-23",mes:5,tipo:"5 Nomina y Turnos",proveedor:"cocina y salon",producto:"3 turnos",valor:230000},
+{fecha:"2026-05-23",mes:5,tipo:"5 Nomina y Turnos",proveedor:"cocina y salon",producto:"3 turnos",valor:230000,metodo:"Caja Menor"},
 {fecha:"2026-05-30",mes:5,tipo:"1 Insumos para Cocina",proveedor:"LA PREMIUM",producto:"Carne",valor:1992835},
 {fecha:"2026-05-31",mes:5,tipo:"5 Nomina y Turnos",proveedor:"OTRO",producto:"Turnos",valor:320000},
 {fecha:"2026-06-01",mes:6,tipo:"1 Insumos para Cocina",proveedor:"Premium",producto:"Carne",valor:2100000},
@@ -590,8 +600,48 @@ function fetchAllData(manual){
   if(IS_DEMO){setTimeout(function(){CIERRES=JSON.parse(JSON.stringify(DEMO_CIERRES));GASTOS=JSON.parse(JSON.stringify(DEMO_GASTOS));setSyncState('ok');toast('Modo demo: mayo + junio','info',4500);afterDataLoad();},400);return;}
   fetch(WEB_APP_URL+'?action=getData',{method:'GET',mode:'cors'}).then(function(res){if(!res.ok)throw new Error('HTTP '+res.status);return res.json();}).then(function(json){CIERRES=(json.cierres||[]).map(normalizeRow);GASTOS=(json.gastos||[]).map(normalizeGasto);setSyncState('ok');if(manual)toast('Datos actualizados','success');afterDataLoad();}).catch(function(err){setSyncState('error');console.error(err);toast('Sin conexion - usando demo','error',4000);if(!CIERRES.length){CIERRES=JSON.parse(JSON.stringify(DEMO_CIERRES));GASTOS=JSON.parse(JSON.stringify(DEMO_GASTOS));afterDataLoad();}});
 }
-function normalizeRow(r){return {fecha:String(r.fecha||''),dia:String(r.dia||''),encargado:String(r.encargado||''),mes:+r.mes||(r.fecha?+String(r.fecha).slice(5,7):0),venta_bruta:+r.venta_bruta||0,propinas:+r.propinas||0,ipoconsumo:+r.ipoconsumo||0,venta_neta:+r.venta_neta||0,clientes:+r.clientes||0,alm_local:+r.alm_local||0,alm_dom:+r.alm_dom||0,ticket_carta:+r.ticket_carta||0,ejecutivos:+r.ejecutivos||0,canal_bonos:+r.canal_bonos||0,canal_eventos:+r.canal_eventos||0,canal_decoracion:+r.canal_decoracion||0,canal_tq:+r.canal_tq||0,qr:+r.qr||0,nequi:+r.nequi||0,datafono:+r.datafono||0,daviplata:+r.daviplata||0,efectivo:+r.efectivo||0,obs:String(r.obs||r.observaciones||'')};}
-function normalizeGasto(g){return {fecha:String(g.fecha||''),mes:+g.mes||(g.fecha?+String(g.fecha).slice(5,7):0),tipo:String(g.tipo||'8 Otros Gastos'),proveedor:String(g.proveedor||''),producto:String(g.producto||''),valor:+g.valor||0};}
+function toNum(v){
+  if(typeof v==='number')return isFinite(v)?v:0;
+  if(v===null||v===undefined)return 0;
+  var s=String(v).trim();
+  if(!s)return 0;
+  // quitar simbolos de moneda, espacios y todo lo que no sea digito, signo, punto o coma
+  s=s.replace(/[^0-9.,-]/g,'');
+  if(!s)return 0;
+  var tienePunto=s.indexOf('.')>=0, tieneComa=s.indexOf(',')>=0;
+  if(tienePunto&&tieneComa){
+    // el ultimo separador es el decimal; el otro es de miles
+    if(s.lastIndexOf(',')>s.lastIndexOf('.')){ s=s.replace(/\./g,'').replace(',','.'); }
+    else { s=s.replace(/,/g,''); }
+  } else if(tieneComa){
+    // solo coma: si parece decimal (una coma y 1-2 decimales) tratar como decimal, si no, miles
+    var partes=s.split(',');
+    if(partes.length===2 && partes[1].length<=2){ s=s.replace(',','.'); }
+    else { s=s.replace(/,/g,''); }
+  } else if(tienePunto){
+    // solo punto: si hay varios puntos son miles; si uno solo con 3 decimales = miles (es. 230.000)
+    var p=s.split('.');
+    if(p.length>2){ s=s.replace(/\./g,''); }
+    else if(p.length===2 && p[1].length===3){ s=s.replace(/\./g,''); }
+    // si es un solo punto con 1-2 decimales se respeta como decimal
+  }
+  var n=parseFloat(s);
+  return isFinite(n)?n:0;
+}
+function normalizeRow(r){return {fecha:String(r.fecha||''),dia:String(r.dia||''),encargado:String(r.encargado||''),mes:+r.mes||(r.fecha?+String(r.fecha).slice(5,7):0),venta_bruta:toNum(r.venta_bruta),propinas:toNum(r.propinas),ipoconsumo:toNum(r.ipoconsumo),venta_neta:toNum(r.venta_neta),clientes:toNum(r.clientes),alm_local:toNum(r.alm_local),alm_dom:toNum(r.alm_dom),ticket_carta:toNum(r.ticket_carta),ejecutivos:toNum(r.ejecutivos),canal_bonos:toNum(r.canal_bonos),canal_eventos:toNum(r.canal_eventos),canal_decoracion:toNum(r.canal_decoracion),canal_tq:toNum(r.canal_tq),qr:toNum(r.qr),nequi:toNum(r.nequi),datafono:toNum(r.datafono),daviplata:toNum(r.daviplata),efectivo:toNum(r.efectivo),obs:String(r.obs||r.observaciones||'')};}
+function normMetodoPago(v){
+  var s=String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  if(s.indexOf('caja')>=0) return 'Caja Menor';
+  if(s.indexOf('efectivo')>=0) return 'Efectivo';
+  if(s.indexOf('transfer')>=0||s.indexOf('transaccion')>=0||s.indexOf('samuel')>=0||s.indexOf('banco')>=0) return 'Transferencia';
+  return s?(''+v).trim():'Sin especificar';
+}
+function normalizeGasto(g){return {fecha:String(g.fecha||''),mes:+g.mes||(g.fecha?+String(g.fecha).slice(5,7):0),tipo:String(g.tipo||'8 Otros Gastos'),proveedor:String(g.proveedor||''),producto:String(g.producto||''),valor:toNum(g.valor),metodo:normMetodoPago(g.metodo||g.metodo_pago||g.metodoPago||g['Metodo de pago']||g['Método de pago']),cortesia_producto:String(g.cortesia_producto||g.producto_entregado||''),cortesia_costo:toNum(g.cortesia_costo||g.costo_producto)};}
+function esCortesia(gasto){
+  // una cortesia es un gasto que tiene costo de producto entregado registrado
+  if(gasto && typeof gasto==='object') return gasto.cortesia_costo>0 || (gasto.cortesia_producto&&String(gasto.cortesia_producto).trim()!=='');
+  return false;
+}
 function afterDataLoad(){setLoading(false);var ms=[];CIERRES.forEach(function(d){if(ms.indexOf(d.mes)<0)ms.push(d.mes);});ms.sort(function(a,b){return a-b;});if(ms.length)selectedMes=ms[ms.length-1];buildMesPills();buildWeekButtons();initResumenCharts();historialFiltrado=CIERRES.slice().reverse();renderHistorial(historialFiltrado);renderHistorialKpis(historialFiltrado);}
 
 function filterMes(arr,m){return arr.filter(function(d){return d.mes===m;});}
@@ -798,7 +848,37 @@ function renderVentasCharts(week){
   document.getElementById('ventasKpis').innerHTML='<div class="kpi" style="--accent:var(--gold)"><span class="kpi-icon">&#128176;</span><div class="kpi-label">Venta Bruta</div><div class="kpi-value">'+fmt(tVB)+'</div><div class="kpi-sub">'+d.length+' dias</div></div><div class="kpi" style="--accent:var(--sage)"><span class="kpi-icon">&#128202;</span><div class="kpi-label">Venta Neta</div><div class="kpi-value">'+fmt(tVN)+'</div><div class="kpi-sub">'+(tVB?(tVN/tVB*100).toFixed(1):'0')+'% de VB</div></div><div class="kpi" style="--accent:var(--rose)"><span class="kpi-icon">&#129534;</span><div class="kpi-label">Gastos</div><div class="kpi-value">'+fmt(tG)+'</div><div class="kpi-sub">'+(tVN?(tG/tVN*100).toFixed(1):'0')+'% de VN</div></div><div class="kpi" style="--accent:var(--lavender)"><span class="kpi-icon">&#128181;</span><div class="kpi-label">Margen (V-G)</div><div class="kpi-value" style="color:'+(margen>=0?'#1faf6b':'#e0495f')+'">'+fmt(margen)+'</div><div class="kpi-sub">Venta neta - gastos</div></div>';
 }
 
+function renderMetodoPago(g,total){
+  var el=document.getElementById('gastosMetodoPago');if(!el)return;
+  var orden=['Efectivo','Caja Menor','Transferencia'];
+  var sum={};g.forEach(function(r){var m=r.metodo||'Sin especificar';sum[m]=(sum[m]||0)+r.valor;});
+  // incluir otros metodos que aparezcan ademas de los 3 estandar
+  Object.keys(sum).forEach(function(m){if(orden.indexOf(m)<0)orden.push(m);});
+  var colores={'Efectivo':'var(--sage)','Caja Menor':'var(--gold)','Transferencia':'var(--sky)','Sin especificar':'var(--muted)'};
+  var iconos={'Efectivo':'\u{1F4B5}','Caja Menor':'\u{1F4B0}','Transferencia':'\u{1F3E6}','Sin especificar':'\u{2753}'};
+  var h='';
+  orden.forEach(function(m){
+    var v=sum[m]||0; if(v===0 && ['Efectivo','Caja Menor','Transferencia'].indexOf(m)<0)return;
+    var pct=total>0?(v/total*100).toFixed(1)+'% del total':'';
+    h+='<div class="canal-card" style="--accent:'+(colores[m]||'var(--muted)')+'"><div class="canal-label">'+(iconos[m]||'')+' '+m+'</div><div class="canal-value">'+fmt(v)+'</div><div class="canal-sub">'+pct+'</div></div>';
+  });
+  el.innerHTML=h||'<div style="color:var(--muted);font-size:13px;padding:6px">Sin datos de metodo de pago</div>';
+}
+function renderCortesias(g){
+  var el=document.getElementById('gastosCortesias');if(!el)return;
+  var cort=g.filter(function(r){return esCortesia(r);});
+  var monto=cort.reduce(function(s,r){return s+(r.cortesia_costo||0);},0);
+  var cant=cort.length;
+  var prom=cant>0?monto/cant:0;
+  var h='';
+  h+='<div class="canal-card" style="--accent:var(--magenta)"><div class="canal-label">\u{1F381} Cortesias despachadas</div><div class="canal-value">'+fmtNum(cant)+'</div><div class="canal-sub">'+(cant===1?'1 cortesia':cant+' cortesias')+'</div></div>';
+  h+='<div class="canal-card" style="--accent:var(--ember)"><div class="canal-label">Monto en cortesias</div><div class="canal-value">'+fmt(monto)+'</div><div class="canal-sub">Costo total entregado</div></div>';
+  h+='<div class="canal-card" style="--accent:var(--lavender)"><div class="canal-label">Cortesia promedio</div><div class="canal-value">'+fmt(prom)+'</div><div class="canal-sub">Por cortesia</div></div>';
+  el.innerHTML=h;
+}
 function renderGastosCharts(week){if(week===-1){renderMetasBar('metasGastos',{tipo:'mes'});}else{renderMetasBar('metasGastos',{tipo:'semana',sem:week});}var base=filterMes(GASTOS,selectedMes);var g=week===-1?base:base.filter(function(r){return r.semana===week;});var tot={};g.forEach(function(r){tot[r.tipo]=(tot[r.tipo]||0)+r.valor;});var keys=Object.keys(tot).sort(function(a,b){return tot[b]-tot[a];});var total=sumBy(g,'valor');var baseC=filterMes(CIERRES,selectedMes);var vnTot=sumBy(week===-1?baseC:baseC.filter(function(r){return r.semana===week;}),'venta_neta');
+  renderMetodoPago(g,total);
+  renderCortesias(g);
   makeChart('chartGastosBar','bar',keys.map(function(k){return TIPO_SHORT[k]||k;}),[{data:keys.map(function(k){return tot[k];}),backgroundColor:keys.map(function(k){return TIPO_COLOR[k]||'#8a93a6';}),borderRadius:7,borderSkipped:false}],{indexAxis:'y',scales:{x:{grid:{color:'rgba(20,30,60,.06)'},ticks:{callback:function(v){return fmt(v);}}},y:{grid:{display:false}}}});
   makeChart('chartGastosPie','doughnut',keys.map(function(k){return TIPO_SHORT[k]||k;}),[{data:keys.map(function(k){return tot[k];}),backgroundColor:keys.map(function(k){return TIPO_COLOR[k];}),borderWidth:2,borderColor:'#fff'}],{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}},cutout:'62%'});
   var coc=tot['1 Insumos para Cocina']||0,nom=tot['5 Nomina y Turnos']||0,svc=tot['6 Servicios Publicos y Arriendo']||0;
