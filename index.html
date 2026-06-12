@@ -628,7 +628,27 @@ function toNum(v){
   var n=parseFloat(s);
   return isFinite(n)?n:0;
 }
-function normalizeRow(r){return {fecha:String(r.fecha||''),dia:String(r.dia||''),encargado:String(r.encargado||''),mes:+r.mes||(r.fecha?+String(r.fecha).slice(5,7):0),venta_bruta:toNum(r.venta_bruta),propinas:toNum(r.propinas),ipoconsumo:toNum(r.ipoconsumo),venta_neta:toNum(r.venta_neta),clientes:toNum(r.clientes),alm_local:toNum(r.alm_local),alm_dom:toNum(r.alm_dom),ticket_carta:toNum(r.ticket_carta),ejecutivos:toNum(r.ejecutivos),canal_bonos:toNum(r.canal_bonos),canal_eventos:toNum(r.canal_eventos),canal_decoracion:toNum(r.canal_decoracion),canal_tq:toNum(r.canal_tq),qr:toNum(r.qr),nequi:toNum(r.nequi),datafono:toNum(r.datafono),daviplata:toNum(r.daviplata),efectivo:toNum(r.efectivo),obs:String(r.obs||r.observaciones||'')};}
+function parseFecha(v){
+  if(v===null||v===undefined)return '';
+  if(typeof v==='string'){
+    var s=v.trim();
+    // ya viene como 2026-05-01
+    var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m)return m[1]+'-'+m[2]+'-'+m[3];
+    // viene como 01/05/2026 o 1/5/2026 (dd/mm/yyyy)
+    var m2=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if(m2)return m2[3]+'-'+('0'+m2[2]).slice(-2)+'-'+('0'+m2[1]).slice(-2);
+  }
+  // cualquier otro caso (incluye "Fri May 01 2026", ISO con hora, Date en texto): usar Date
+  var d=new Date(v);
+  if(!isNaN(d.getTime())){
+    var y=d.getFullYear();var mo=('0'+(d.getMonth()+1)).slice(-2);var da=('0'+d.getDate()).slice(-2);
+    return y+'-'+mo+'-'+da;
+  }
+  return String(v);
+}
+function mesDeFecha(f){var s=parseFecha(f);return s.length>=7?parseInt(s.slice(5,7),10):0;}
+function normalizeRow(r){var fz=parseFecha(r.fecha);return {fecha:fz,dia:String(r.dia||''),encargado:String(r.encargado||''),mes:+r.mes||mesDeFecha(fz),venta_bruta:toNum(r.venta_bruta),propinas:toNum(r.propinas),ipoconsumo:toNum(r.ipoconsumo),venta_neta:toNum(r.venta_neta),clientes:toNum(r.clientes),alm_local:toNum(r.alm_local),alm_dom:toNum(r.alm_dom),ticket_carta:toNum(r.ticket_carta),ejecutivos:toNum(r.ejecutivos),canal_bonos:toNum(r.canal_bonos),canal_eventos:toNum(r.canal_eventos),canal_decoracion:toNum(r.canal_decoracion),canal_tq:toNum(r.canal_tq),qr:toNum(r.qr),nequi:toNum(r.nequi),datafono:toNum(r.datafono),daviplata:toNum(r.daviplata),efectivo:toNum(r.efectivo),obs:String(r.obs||r.observaciones||'')};}
 function normMetodoPago(v){
   var s=String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
   if(s.indexOf('caja')>=0) return 'Caja Menor';
@@ -636,7 +656,7 @@ function normMetodoPago(v){
   if(s.indexOf('transfer')>=0||s.indexOf('transaccion')>=0||s.indexOf('samuel')>=0||s.indexOf('banco')>=0) return 'Transferencia';
   return s?(''+v).trim():'Sin especificar';
 }
-function normalizeGasto(g){return {fecha:String(g.fecha||''),mes:+g.mes||(g.fecha?+String(g.fecha).slice(5,7):0),tipo:String(g.tipo||'8 Otros Gastos'),proveedor:String(g.proveedor||''),producto:String(g.producto||''),valor:toNum(g.valor),metodo:normMetodoPago(g.metodo||g.metodo_pago||g.metodoPago||g['Metodo de pago']||g['Método de pago']),cortesia_producto:String(g.cortesia_producto||g.producto_entregado||''),cortesia_costo:toNum(g.cortesia_costo||g.costo_producto)};}
+function normalizeGasto(g){var fz=parseFecha(g.fecha);return {fecha:fz,mes:+g.mes||mesDeFecha(fz),tipo:String(g.tipo||'8 Otros Gastos'),proveedor:String(g.proveedor||''),producto:String(g.producto||''),valor:toNum(g.valor),metodo:normMetodoPago(g.metodo||g.metodo_pago||g.metodoPago||g['Metodo de pago']||g['Método de pago']),cortesia_producto:String(g.cortesia_producto||g.producto_entregado||''),cortesia_costo:toNum(g.cortesia_costo||g.costo_producto)};}
 function esCortesia(gasto){
   // una cortesia es un gasto que tiene costo de producto entregado registrado
   if(gasto && typeof gasto==='object') return gasto.cortesia_costo>0 || (gasto.cortesia_producto&&String(gasto.cortesia_producto).trim()!=='');
