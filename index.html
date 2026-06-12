@@ -1282,6 +1282,21 @@ function descargarInformeContable(){
   gk.forEach(function(k){fila((TIPO_SHORT[k]||k),fmtFull(gt[k])+'   ('+(totGastos>0?(gt[k]/totGastos*100).toFixed(1):'0')+'%)');});
   fila('TOTAL GASTOS',fmtFull(totGastos),true);
 
+  seccion('5b. Gastos por metodo de pago');
+  var mpC={Efectivo:0,'Caja Menor':0,Transferencia:0};
+  gastos.forEach(function(x){var m=x.metodo||'Sin especificar';mpC[m]=(mpC[m]||0)+x.valor;});
+  Object.keys(mpC).forEach(function(m){fila(m,fmtFull(mpC[m]||0)+'   ('+(totGastos>0?((mpC[m]||0)/totGastos*100).toFixed(1):'0')+'%)');});
+
+  var cortC=gastos.filter(function(x){return (x.cortesia_costo>0)||(x.cortesia_producto&&String(x.cortesia_producto).trim()!=='');});
+  seccion('5c. Cortesias entregadas ('+cortC.length+')');
+  if(cortC.length){
+    cortC.forEach(function(x){fila((x.fecha||'')+'  '+(x.cortesia_producto||'Cortesia'),fmtFull(x.cortesia_costo||0));});
+    var totCortC=cortC.reduce(function(s,x){return s+(x.cortesia_costo||0);},0);
+    fila('TOTAL CORTESIAS',fmtFull(totCortC),true);
+  } else {
+    fila('No se registraron cortesias en el periodo','');
+  }
+
   seccion('6. Conciliacion de medios de pago');
   fila('Datafono / Tarjetas',fmtFull(pagos.Datafono));
   fila('Efectivo en caja',fmtFull(pagos.Efectivo));
@@ -1408,6 +1423,24 @@ function descargarCierrePDF(){
   var margen=vn-totG;
   doc.setTextColor(margen>=0?31:224,margen>=0?175:73,margen>=0?107:95);
   doc.text('Margen del dia (V-G)',48,y);doc.text(fmtFull(margen),W-48,y,{align:'right'});y+=8;
+  // ----- GASTOS POR METODO DE PAGO -----
+  if(y>700){doc.addPage();y=48;}
+  y+=6;seccion('Gastos por metodo de pago');
+  var mp={Efectivo:0,'Caja Menor':0,Transferencia:0};
+  gd.forEach(function(x){var m=x.metodo||'Sin especificar';mp[m]=(mp[m]||0)+x.valor;});
+  Object.keys(mp).forEach(function(m){if(mp[m]>0||['Efectivo','Caja Menor','Transferencia'].indexOf(m)>=0)fila(m,fmtFull(mp[m]||0));});
+  // ----- CORTESIAS -----
+  var cort=gd.filter(function(x){return (x.cortesia_costo>0)||(x.cortesia_producto&&String(x.cortesia_producto).trim()!=='');});
+  y+=6;seccion('Cortesias del dia ('+cort.length+')');
+  if(cort.length){
+    cort.forEach(function(x){if(y>790){doc.addPage();y=48;}fila((x.cortesia_producto||'Cortesia'),fmtFull(x.cortesia_costo||0));});
+    var totCort=cort.reduce(function(s,x){return s+(x.cortesia_costo||0);},0);
+    y+=2;doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(ink[0],ink[1],ink[2]);
+    doc.text('Total cortesias',48,y);doc.text(fmtFull(totCort),W-48,y,{align:'right'});y+=18;
+  } else {
+    doc.setTextColor(dim[0],dim[1],dim[2]);doc.setFont('helvetica','normal');doc.setFontSize(10);
+    doc.text('No se registraron cortesias este dia.',48,y);y+=18;
+  }
   // ----- ANALISIS Y ESTRATEGIAS (medio) -----
   function parrafoC(t){doc.setTextColor(ink[0],ink[1],ink[2]);doc.setFont('helvetica','normal');doc.setFontSize(10);var ls=doc.splitTextToSize(t,W-96);for(var i=0;i<ls.length;i++){if(y>790){doc.addPage();y=48;}doc.text(ls[i],48,y);y+=15;}y+=4;}
   function bullC(t){if(y>790){doc.addPage();y=48;}doc.setTextColor(199,147,48);doc.setFont('helvetica','bold');doc.setFontSize(10);doc.text('>',48,y);doc.setTextColor(ink[0],ink[1],ink[2]);doc.setFont('helvetica','normal');var ls=doc.splitTextToSize(t,W-110);for(var i=0;i<ls.length;i++){doc.text(ls[i],62,y);y+=15;}y+=2;}
